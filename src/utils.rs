@@ -3,10 +3,22 @@ use std::{
     io::{self, Read},
     path::Path,
 };
+
+
 pub const KB: u64 = 1024;
 pub const MB: u64 = 1024 * KB;
 pub const GB: u64 = 1024 * MB;
 
+/// Helper to pull bytes from a [Read]er into a buffer until either the buffer
+/// is filled or we read the end of the [Read]er. Returns the number of bytes
+/// read. 
+/// 
+/// If the `read_exact_or_end(rdr, buf)? != buf.len()` then it is guranteed that
+/// `rdr` has reached `EOF`.
+/// 
+/// This is necessary since [Read::read] does not gurantee that the buffer being
+/// filled means we've reached `EOF`, and [Read::read_exact] will return an
+/// [io::Error] if it reaches `EOF` before filling the buffer. 
 pub fn read_exact_or_end<T: Read>(reader: &mut T, buffer: &mut [u8]) -> io::Result<usize> {
     let mut cur_idx = 0;
     loop {
@@ -22,6 +34,12 @@ pub fn read_exact_or_end<T: Read>(reader: &mut T, buffer: &mut [u8]) -> io::Resu
     }
 }
 
+/// Wrapper around [std::fs::hard_link] that lets us overwrite existing files. 
+/// 
+/// # Implementation details
+/// This enables overwriting by first checking if the previous file exists, and
+/// if so renaming it and then deleting the renamed file once the
+/// [std::fs::hard_link] call completes. 
 pub fn hard_link(left: &Path, right: &Path) -> io::Result<()> {
     let old_right_ext = right.extension().unwrap_or_default();
     let new_right_ext = {
