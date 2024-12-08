@@ -3,14 +3,14 @@ use std::{
     fmt::Debug,
     fs::File,
     hash::{Hash, Hasher},
-    io::{self, Read, Seek, SeekFrom},
+    io::{self, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
 use log::trace;
 use seahash::SeaHasher;
 
-use crate::utils::{GB, MB};
+use crate::{read_exact_or_end, utils::{GB, MB}};
 
 /// The number of bytes in each sample.
 const SAMPLE_SIZE: usize = 8 * 1024;
@@ -42,10 +42,11 @@ impl FileHashes {
         trace!("Now hashing {path:?}");
 
         let mut fh = File::open(path)?;
+
+        // Calculate the size using a seek-to-end to avoid the fs::metadata
+        // call, which is very slow on certain platforms due to all the extra
+        // information it pulls in
         let size = fh.seek(SeekFrom::End(0))?;
-        let curpos = fh.seek(SeekFrom::Start(0))?;
-        assert_ne!(0, size);
-        assert_eq!(0, curpos);
 
         let skiplen = calculate_skiplen(size, SAMPLE_SIZE);
 
@@ -54,14 +55,14 @@ impl FileHashes {
         let mut total_read = 0;
         let mut samples = 0;
         loop {
-            let read_count = fh.read(&mut buffer)?;
+            let read_count = read_exact_or_end(&mut fh, &mut buffer)?; 
             total_read += read_count;
-            if read_count == 0 {
-                break;
-            }
-            samples += 1;
             let subbuf = &buffer[..read_count];
             sea_hasher.write(subbuf);
+            samples += 1;
+            if read_count != buffer.len() {
+                break;
+            }
             fh.seek(SeekFrom::Current(skiplen))?;
         }
         trace!("Finished hashing {path:?} using using {samples} samples ({total_read} bytes).");
