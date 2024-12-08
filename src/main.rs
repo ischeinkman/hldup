@@ -11,7 +11,7 @@ mod utils;
 
 fn init_logger() {
     let env = env_logger::Env::new()
-        .filter_or("HLDUP_LOG", "TRACE")
+        .filter_or("HLDUP_LOG", "WARN")
         .write_style_or("HLDUP_COLOR", "auto");
     let mut logger = env_logger::Builder::from_env(env);
     logger.init();
