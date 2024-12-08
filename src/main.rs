@@ -148,6 +148,15 @@ pub fn dedup_files(cache: &HashCache, prompt_mode: PromptUserMode) {
     let dups = cache.duplicates();
     info!("Found {} possible dupes.", dups.len());
     for flist in cache.duplicates() {
+
+        // We need to check all possible pairs of files we can generate out of
+        // the flist because of the possibility that, if we have 3 files with
+        // the same hash, only 2 of them are identical; or in a 4 file case, we
+        // actually have 2 pairs of identical files, etc. 
+        //
+        // To do this we do some basic pre-processing of the file list,
+        // generating it and then removing all `(a, a)` pairs and also any `(b,
+        // a)` pairs where we already had the `(a, b)` equivalent.   
         let pairs = flist
             .iter()
             .flat_map(|left| flist.iter().map(move |right| (left, right)))
@@ -160,6 +169,8 @@ pub fn dedup_files(cache: &HashCache, prompt_mode: PromptUserMode) {
                 }
             })
             .collect::<HashSet<_>>();
+
+        
         for (left, right) in pairs {
             match is_same_file(left, right) {
                 Ok(false) => {

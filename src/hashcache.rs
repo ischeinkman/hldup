@@ -32,7 +32,10 @@ const MAX_SAMPLES_MIN: u64 = 16 * GB;
 /// detection accuracy for speed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct FileHashes {
+    /// A hash made by feeding a number of samples from different locations in
+    /// the file into a the [seahash] algorithm.
     sea: u64,
+    /// The size of the file, treated as a hash.
     size: u64,
 }
 
@@ -145,11 +148,17 @@ fn calculate_skiplen(filesize: u64, buffsize: usize) -> i64 {
         return 0;
     }
 
+    // We scale it logarithmically by getting the base-2 log of all sizes and
+    // then doing a basic linear map 
+
     let size_factor = filesize.ilog2();
 
     let samples = MIN_SAMPLES
         + (size_factor * (MAX_SAMPLES - MIN_SAMPLES))
             / (MAX_SAMPLES_MIN.ilog2() - MIN_SAMPLES_MAX.ilog2());
     let samples = samples.min(MAX_SAMPLES) as u64;
+
+    // Subtract buffsize because that will already be consumed during the `read`
+    // call
     ((filesize / samples) - buffsize) as i64
 }
