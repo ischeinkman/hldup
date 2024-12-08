@@ -5,7 +5,6 @@ use std::{
     hash::{Hash, Hasher},
     io::{self, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
-    sync::RwLock,
 };
 
 use log::trace;
@@ -18,19 +17,19 @@ const SAMPLE_SIZE: usize = 8 * 1024;
 
 /// The minimum samples to take when hashing a file.
 const MIN_SAMPLES: u32 = 2;
-/// The maximum size of a file where we will take [MIN_SAMPLES] samples. 
+/// The maximum size of a file where we will take [MIN_SAMPLES] samples.
 const MIN_SAMPLES_MAX: u64 = 1 * MB;
 /// The maximum number to take when hashing a file (-1 due to modulo calculations).
 const MAX_SAMPLES: u32 = 4;
-/// The minimum size of a file where we will take [MAX_SAMPLES] samples. 
+/// The minimum size of a file where we will take [MAX_SAMPLES] samples.
 const MAX_SAMPLES_MIN: u64 = 16 * GB;
 
 /// A set of hash values to identify a file when looking for potential file
-/// duplicates. 
-/// 
+/// duplicates.
+///
 /// Note that it should NOT be assumed that 2 files with the same [FileHashes]
 /// are identical; this structure explicitly and emphatically trades collision
-/// detection accuracy for speed. 
+/// detection accuracy for speed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct FileHashes {
     sea: u64,
@@ -38,8 +37,7 @@ pub struct FileHashes {
 }
 
 impl FileHashes {
-
-    /// Calculates the [FileHashes] for the file at the given path. 
+    /// Calculates the [FileHashes] for the file at the given path.
     pub fn from_path(path: &Path) -> Result<Self, io::Error> {
         trace!("Now hashing {path:?}");
 
@@ -73,10 +71,10 @@ impl FileHashes {
 }
 
 /// A cache of files and their [FileHashes] for quick lookup of possible
-/// duplicate candidates. 
+/// duplicate candidates.
 #[derive(Default)]
 pub struct HashCache {
-    inner: RwLock<HashMap<FileHashes, HashSet<PathBuf>>>,
+    inner: HashMap<FileHashes, HashSet<PathBuf>>,
 }
 
 impl HashCache {
@@ -86,36 +84,26 @@ impl HashCache {
     }
 
     /// Inserts a new path & associated [FileHashes] into this [HashCache].
-    pub fn insert(&self, path: PathBuf, hashes: FileHashes) {
-        self.inner
-            .write()
-            .unwrap_or_else(|e| e.into_inner())
-            .entry(hashes)
-            .or_default()
-            .insert(path);
+    pub fn insert(&mut self, path: PathBuf, hashes: FileHashes) {
+        self.inner.entry(hashes).or_default().insert(path);
     }
 
     /// Joins 2 [HashCache] collections into a single [HashCache].
-    /// 
+    ///
     /// The returned values will have all hashes & files from both [self] and `other`.
-    pub fn join(self, other: Self) -> Self {
-        let mut inner = self.inner.into_inner().unwrap_or_else(|e| e.into_inner());
-        for (k, v) in other.inner.into_inner().unwrap_or_else(|e| e.into_inner()) {
-            inner.entry(k).or_default().extend(v);
+    pub fn join(mut self, other: Self) -> Self {
+        for (k, v) in other.inner {
+            self.inner.entry(k).or_default().extend(v);
         }
-        Self {
-            inner: RwLock::new(inner),
-        }
+        Self { inner: self.inner }
     }
 
-    /// Retrieves the list of paths with duplicate hash values. 
-    /// 
+    /// Retrieves the list of paths with duplicate hash values.
+    ///
     /// Each entry of the returned list represents a set of paths with the same
     /// hash.
     pub fn duplicates(&self) -> Vec<HashSet<PathBuf>> {
         self.inner
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
             .values()
             .filter(|buf| buf.len() >= 2)
             .cloned()
@@ -141,8 +129,8 @@ impl FromIterator<HashCache> for HashCache {
     }
 }
 
-/// Calculates the amount of the file to skip when reading blocks to calculate the hash. 
-/// 
+/// Calculates the amount of the file to skip when reading blocks to calculate the hash.
+///
 // Why not just read the entire thing? Many files a user would want to run this
 // program are are large; this program is a space-saving tool. As such, reading
 // & calculating the hash for a 1+GB file is slow, spanning seconds, so if there

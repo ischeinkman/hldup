@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io::stdin, path::PathBuf, process::ExitCode, sync::Arc};
+use std::{collections::HashSet, io::stdin, path::PathBuf, process::ExitCode};
 
 use dupchecks::{is_same_file, should_link};
 use hashcache::{FileHashes, HashCache};
@@ -102,7 +102,7 @@ fn prompt_bool(msg: &str) -> bool {
 pub fn build_hash_cache(root: PathBuf) -> HashCache {
     debug!("Building hashcache for root dir {root:?}");
 
-    let retvl = Arc::new(HashCache::new());
+    let mut retvl = HashCache::new();
     for ent in WalkDir::new(root) {
         let ent = match ent {
             Ok(v) => v,
@@ -130,7 +130,6 @@ pub fn build_hash_cache(root: PathBuf) -> HashCache {
                 }
             }
         };
-        let retvl = Arc::clone(&retvl);
         debug!("Calculating hash for file {path:?}");
         let hash = match FileHashes::from_path(&path) {
             Ok(v) => v,
@@ -142,7 +141,7 @@ pub fn build_hash_cache(root: PathBuf) -> HashCache {
         retvl.insert(path, hash);
     }
 
-    Arc::into_inner(retvl).expect("Somehow had dangling refs after all tasks exited!?")
+    retvl
 }
 
 pub fn dedup_files(cache: &HashCache, prompt_mode: PromptUserMode) {
