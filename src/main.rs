@@ -11,7 +11,7 @@ mod utils;
 
 fn init_logger() {
     let env = env_logger::Env::new()
-        .filter_or("HLDUP_LOG", "WARN")
+        .filter_or("HLDUP_LOG", "INFO")
         .write_style_or("HLDUP_COLOR", "auto");
     let mut logger = env_logger::Builder::from_env(env);
     logger.init();
@@ -148,9 +148,6 @@ pub fn dedup_files(cache: &HashCache, prompt_mode: PromptUserMode) {
     let dups = cache.duplicates();
     info!("Found {} possible dupes.", dups.len());
     for flist in cache.duplicates() {
-        if flist.len() <= 1 {
-            continue;
-        }
         let pairs = flist
             .iter()
             .flat_map(|left| flist.iter().map(move |right| (left, right)))
@@ -164,9 +161,6 @@ pub fn dedup_files(cache: &HashCache, prompt_mode: PromptUserMode) {
             })
             .collect::<HashSet<_>>();
         for (left, right) in pairs {
-            if left == right {
-                continue;
-            }
             match is_same_file(left, right) {
                 Ok(false) => {
                     //TODO: Log
