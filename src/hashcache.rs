@@ -10,7 +10,10 @@ use std::{
 use log::trace;
 use seahash::SeaHasher;
 
-use crate::{read_exact_or_end, utils::{GB, MB}};
+use crate::{
+    read_exact_or_end,
+    utils::{GB, MB},
+};
 
 /// The number of bytes in each sample.
 const SAMPLE_SIZE: usize = 8 * 1024;
@@ -50,7 +53,7 @@ impl FileHashes {
         // call, which is very slow on certain platforms due to all the extra
         // information it pulls in
         let size = fh.seek(SeekFrom::End(0))?;
-
+        fh.seek(SeekFrom::Start(0))?;
         let skiplen = calculate_skiplen(size, SAMPLE_SIZE);
 
         let mut sea_hasher = SeaHasher::new();
@@ -58,7 +61,7 @@ impl FileHashes {
         let mut total_read = 0;
         let mut samples = 0;
         loop {
-            let read_count = read_exact_or_end(&mut fh, &mut buffer)?; 
+            let read_count = read_exact_or_end(&mut fh, &mut buffer)?;
             total_read += read_count;
             let subbuf = &buffer[..read_count];
             sea_hasher.write(subbuf);
@@ -149,7 +152,7 @@ fn calculate_skiplen(filesize: u64, buffsize: usize) -> i64 {
     }
 
     // We scale it logarithmically by getting the base-2 log of all sizes and
-    // then doing a basic linear map 
+    // then doing a basic linear map
 
     let size_factor = filesize.ilog2();
 
